@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 
+ctx = snowflake.connector.connect( user='your_user_name', password='your_password', account='your_account_name' )
+
 st.title('Uber pickups in NYC')
 
 DATE_COLUMN = 'date/time'
