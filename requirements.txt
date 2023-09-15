@@ -1,3 +1,7 @@
 streamlit
 pandas
 numpy
+snowflake-connector-python
+snowflake-snowpark-python[pandas]
+boto3
+botocore
