@@ -95,11 +95,11 @@ with tab2:
         valeur_text = st.number_input('🔢 Insérez une valeur numérique')
         ok_button = st.form_submit_button("Valider")
     df = session.sql("select * from DEBIT_POINTE")
-    col1, col2 = st.columns(2)
-    col1.table(df.select(
-        col("journee"), col("site"), col("combustible"), col("valeur")
-    ))
-    edited_df = col2.data_editor(df, use_container_width=True, disabled=["journee", "site", "combustible", "valeur"])
+    st.write(
+        """Table mise à jour avec les dernières données 
+        """
+    )
+    edited_df = st.data_editor(df, use_container_width=True, disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "VALEUR"])
     # col2.table(df)
     snowdf = session.create_dataframe(edited_df)
     valid_bt = st.button('Valider')
