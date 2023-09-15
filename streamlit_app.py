@@ -9,6 +9,8 @@ from snowflake.snowpark import Session
 from snowflake.snowpark.functions import col
 from aws_connector import get_secret_value
 import plotly.express as px
+import plotly.figure_factory as ff
+
 
 # # Get the credentials
 # config_location = '.'
@@ -64,16 +66,13 @@ with middle:
 tab1, tab2, tab3 = st.tabs(["Explo données", "Insertion données", "Validation"])
 
 with tab1:
-    # This dataframe has 244 lines, but 4 distinct values for `day`
-    df = px.data.tips()
-    fig = px.pie(df, values='tip', names='day')
+    df = session.sql("select site,sum(valeur)as valeur from DEBIT_POINTE group by site")
+    fig = px.bar(df, y='VALEUR', x='SITE',
+                 color=['#91c8ab', '#1a985b', '#fec828'],
+                 color_discrete_map="identity",
+                 title='Histogramme montrant la production de combustibles par site')
     st.plotly_chart(fig)
 
-    df = session.sql("select site,combustible,sum(valeur)as valeur from DEBIT_POINTE group by site,combustible")
-    st.bar_chart(df,
-                 x='SITE',
-                 y='VALEUR'
-                 )
     # pass
 
 with tab2:
@@ -86,21 +85,21 @@ with tab2:
     # Get the current credentials
     with st.form("Debit pointe "):
         today = datetime.datetime.now()
-        d = st.date_input("Date", today)
+        d = st.date_input("🗓️ Date", today)
         site_sb = st.selectbox(
-            'Selectionnez un site ?',
+            '🏭 Selectionnez un site',
             ('VITRY', 'SAINT OUEN', 'VAUGIRARD'))
         combustible_sb = st.selectbox(
-            'Selectionnez un combustible ?',
+            '⚡ Selectionnez un combustible',
             ('GAZ', 'BIO GAZ', 'BIO LIQUIDE'))
-        valeur_text = st.number_input('inserez une valeur numérique')
+        valeur_text = st.number_input('🔢 Insérez une valeur numérique')
         ok_button = st.form_submit_button("Valider")
     df = session.sql("select * from DEBIT_POINTE")
     col1, col2 = st.columns(2)
     col1.table(df.select(
         col("journee"), col("site"), col("combustible"), col("valeur")
     ))
-    edited_df = col2.data_editor(df, use_container_width=True)
+    edited_df = col2.data_editor(df, use_container_width=True, disabled=["journee", "site", "combustible", "valeur"])
     # col2.table(df)
     snowdf = session.create_dataframe(edited_df)
     valid_bt = st.button('Valider')
