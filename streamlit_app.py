@@ -7,7 +7,7 @@ import datetime
 from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import col
-from src.aws_connector import get_secret_value
+from aws_connector import get_secret_value
 
 # Get the credentials
 config_location = '.'
