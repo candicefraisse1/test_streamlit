@@ -10,7 +10,7 @@ from snowflake.snowpark.functions import col
 from aws_connector import get_secret_value
 import plotly.express as px
 import plotly.figure_factory as ff
-from datetime import date
+from datetime import date, timedelta
 
 
 # # Get the credentials
@@ -64,25 +64,75 @@ with middle:
     st.image('c-logo.svg')
 
 
-tab1, tab2, tab3 = st.tabs(["Explo données", "Insertion données", "Validation"])
+tab1, tab2, tab3, tab4 = st.tabs(["Saisie Provisionnelle", "Saisie des données réelles", "Insertion des données", "Exploration des données"])
 
 with tab1:
-    df = session.sql("select site,sum(valeur)as valeur from DEBIT_POINTE group by site")
-    fig = px.bar(df, y='VALEUR', x='SITE',
-                 color=['#91c8ab', '#1a985b', '#fec828'],
-                color_discrete_map="identity",
-                 title='Histogramme montrant la production de combustibles par site')
-    st.plotly_chart(fig)
+    st.title("Saisie Provisionnelle")
 
-    # pass
+    today_date_str = date.today().strftime('%Y-%m-%d')
+    st.write(
+        today_date_str
+    )
+    chosen_date = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+
+    list_of_rows = [
+        ["SAINT_OUEN_1", "GAZ", "tv"],
+        ["SAINT_OUEN_2", "CHARBON_ET_BOIS", "tv"],
+        ["SAINT_OUEN_3", "GAZ_AA", "tv"],
+        ["SAINT_OUEN_3", "GAZ_RS","tv"],
+        ["SAINT_OUEN_3", "GAZ_PC","tv"],
+        ["BERCY", "GAZ", "tv"],
+        ["BERCY", "BIOGAZ", "tv"],
+        ["BERCY", "BIO_COMB_LIQUIDE", "tv"],
+        ["GRENELLE", "GAZ", "tv"],
+        ["GRENELLE", "BIOGAZ", "tv"],
+        ["GRENELLE", "BIO_COMB_LIQUIDE","tv"],
+        ["VAUGIGARD", "GAZ", "tv"],
+        ["VAUGIGARD", "BIOGAZ","tv"],
+        ["IVRY", "GAZ","tv"],
+        ["IVRY", "BIOGAZ","tv"],
+        ["KB", "GAZ", "tv"],
+        ["VITRY", "GAZ_AA", "tv"],
+        ["VITRY", "GAZ_RS", "tv"],
+        ["VITRY", "GAZ_PC", "tv"],
+        ["SALPETRIERE", "GAZ","tv"],
+        ["SYCTOM_IP13", "OM_IP13","tv"],
+        ["SYCTOM_ISSEANE", "OM_ISSEANE","tv"],
+        ["SYCTOM_ST_OUEN", "OM_ST_OUEN","tv"]
+    ]
+    df = pd.DataFrame(
+        list_of_rows,
+        columns=["SITE", "COMBUSTIBLE", "UNITE"]
+    )
+    df["VALEUR_PREVISIONNELLE"] = 0
+
+    with st.form("my_form"):
+        st.data_editor(
+            df,
+            use_container_width=True,
+            disabled=["SITE", "COMBUSTIBLE", "UNITE"],
+            hide_index=True
+        )
+        submitted = st.form_submit_button("Submit")
+
+    df["JOURNEE"] = chosen_date
+    df["VALEUR_REELLE"] = 0
+    df["VALEUR_CONSOLIDE"] =False
+
+    
+    existing_df = session.sql("select * from KPI_GIM_DEBIT_POINTE").to_df("JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE", "VALEUR_REELLE", "VALEUR_CONSOLIDE")
+    if submitted:
+        pd.concat([existing_df, df])
 
 with tab2:
-    st.title("Debit pointe ")
+    st.title("Saisie des données réelles")
+    previous_date_str = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
     st.write(
-        """Exemple pour simuler le fichier excel sur sharepoint debit pointe 
-        """
+        previous_date_str
     )
 
+with tab3:
+    st.title("Insertion des données")
     # Get the current credentials
     with st.form("Debit pointe "):
         today = datetime.datetime.now()
@@ -122,56 +172,16 @@ with tab2:
         st.experimental_rerun()
 
 
-with tab3:
-    st.title("Interface de Validation")
+with tab4:
+    st.title("Exploration des données des données")
+    df = session.sql("select site,sum(valeur)as valeur from DEBIT_POINTE group by site")
+    fig = px.bar(df, y='VALEUR', x='SITE',
+                 color=['#91c8ab', '#1a985b', '#fec828'],
+                 color_discrete_map="identity",
+                 title='Histogramme montrant la production de combustibles par site')
+    st.plotly_chart(fig)
 
-    if ok_button:
-        pass
-
-    today_date_str = date.today().strftime('%Y-%m-%d')
-
-    list_of_rows = [
-        [today_date_str, "SAINT_OUEN_1", "GAZ", 0, 0],
-        [today_date_str, "SAINT_OUEN_2", "CHARBON_ET_BOIS", 0, 0],
-        [today_date_str, "SAINT_OUEN_3", "GAZ_AA", 0, 0],
-        [today_date_str, "SAINT_OUEN_3", "GAZ_RS", 0, 0],
-        [today_date_str, "SAINT_OUEN_3", "GAZ_PC", 0, 0],
-        [today_date_str, "BERCY", "GAZ", 0, 0],
-        [today_date_str, "BERCY", "BIOGAZ", 0, 0],
-        [today_date_str, "BERCY", "BIO_COMB_LIQUIDE", 0, 0],
-        [today_date_str, "GRENELLE", "GAZ", 0, 0],
-        [today_date_str, "GRENELLE", "BIOGAZ", 0, 0],
-        [today_date_str, "GRENELLE", "BIO_COMB_LIQUIDE", 0, 0],
-        [today_date_str, "VAUGIGARD", "GAZ", 0, 0],
-        [today_date_str, "VAUGIGARD", "BIOGAZ", 0, 0],
-        [today_date_str, "IVRY", "GAZ", 0, 0],
-        [today_date_str, "IVRY", "BIOGAZ", 0, 0],
-        [today_date_str, "KB", "GAZ", 0, 0],
-        [today_date_str, "VITRY", "GAZ_AA", 0, 0],
-        [today_date_str, "VITRY", "GAZ_RS", 0, 0],
-        [today_date_str, "VITRY", "GAZ_PC", 0, 0],
-        [today_date_str, "SALPETRIERE", "GAZ", 0, 0],
-        [today_date_str, "SYCTOM", "OM_IP13", 0, 0],
-        [today_date_str, "SYCTOM", "OM_ISSEANE", 0, 0],
-        [today_date_str, "SYCTOM", "OM_ST_OUEN", 0, 0],
-    ]
-    df = pd.DataFrame(
-        list_of_rows,
-        columns=["JOURNEE", "SITE", "COMBUSTIBLE", "VALEUR_PREVISIONNELLE", "VALEUR_REELLE"]
-    )
-
-    with st.form("my_form"):
-        st.data_editor(
-            df,
-            use_container_width=True,
-            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "VALEUR_PREVISIONNELLE"],
-            hide_index=True
-        )
-        submitted = st.form_submit_button("Submit")
-
-    if submitted:
-
-        pass
+    # pass
 
     # if valid_bt:
     #     snowdf.write.mode("overwrite").save_as_table("DEBIT_POINTE")
