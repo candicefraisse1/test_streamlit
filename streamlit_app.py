@@ -74,37 +74,41 @@ with tab1:
         today_date_str
     )
     chosen_date = today_date_str
+    df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')").to_pandas()
 
-    list_of_rows = [
-        ["SAINT_OUEN_1", "GAZ", "tv"],
-        ["SAINT_OUEN_2", "CHARBON_ET_BOIS", "tv"],
-        ["SAINT_OUEN_3", "GAZ_AA", "tv"],
-        ["SAINT_OUEN_3", "GAZ_RS","tv"],
-        ["SAINT_OUEN_3", "GAZ_PC","tv"],
-        ["BERCY", "GAZ", "tv"],
-        ["BERCY", "BIOGAZ", "tv"],
-        ["BERCY", "BIO_COMB_LIQUIDE", "tv"],
-        ["GRENELLE", "GAZ", "tv"],
-        ["GRENELLE", "BIOGAZ", "tv"],
-        ["GRENELLE", "BIO_COMB_LIQUIDE","tv"],
-        ["VAUGIGARD", "GAZ", "tv"],
-        ["VAUGIGARD", "BIOGAZ","tv"],
-        ["IVRY", "GAZ","tv"],
-        ["IVRY", "BIOGAZ","tv"],
-        ["KB", "GAZ", "tv"],
-        ["VITRY", "GAZ_AA", "tv"],
-        ["VITRY", "GAZ_RS", "tv"],
-        ["VITRY", "GAZ_PC", "tv"],
-        ["SALPETRIERE", "GAZ","tv"],
-        ["SYCTOM_IP13", "OM_IP13","tv"],
-        ["SYCTOM_ISSEANE", "OM_ISSEANE","tv"],
-        ["SYCTOM_ST_OUEN", "OM_ST_OUEN","tv"]
-    ]
-    df = pd.DataFrame(
-        list_of_rows,
-        columns=["SITE", "COMBUSTIBLE", "UNITE"]
-    )
-    df["VALEUR_PREVISIONNELLE"] = 0
+    if df.empty():
+        list_of_rows = [
+            ["SAINT_OUEN_1", "GAZ", "tv"],
+            ["SAINT_OUEN_2", "CHARBON_ET_BOIS", "tv"],
+            ["SAINT_OUEN_3", "GAZ_AA", "tv"],
+            ["SAINT_OUEN_3", "GAZ_RS","tv"],
+            ["SAINT_OUEN_3", "GAZ_PC","tv"],
+            ["BERCY", "GAZ", "tv"],
+            ["BERCY", "BIOGAZ", "tv"],
+            ["BERCY", "BIO_COMB_LIQUIDE", "tv"],
+            ["GRENELLE", "GAZ", "tv"],
+            ["GRENELLE", "BIOGAZ", "tv"],
+            ["GRENELLE", "BIO_COMB_LIQUIDE","tv"],
+            ["VAUGIGARD", "GAZ", "tv"],
+            ["VAUGIGARD", "BIOGAZ","tv"],
+            ["IVRY", "GAZ","tv"],
+            ["IVRY", "BIOGAZ","tv"],
+            ["KB", "GAZ", "tv"],
+            ["VITRY", "GAZ_AA", "tv"],
+            ["VITRY", "GAZ_RS", "tv"],
+            ["VITRY", "GAZ_PC", "tv"],
+            ["SALPETRIERE", "GAZ","tv"],
+            ["SYCTOM_IP13", "OM_IP13","tv"],
+            ["SYCTOM_ISSEANE", "OM_ISSEANE","tv"],
+            ["SYCTOM_ST_OUEN", "OM_ST_OUEN","tv"]
+        ]
+        df = pd.DataFrame(
+            list_of_rows,
+            columns=["SITE", "COMBUSTIBLE", "UNITE"]
+        )
+        df["VALEUR_PREVISIONNELLE"] = 0
+    else:
+        df= df.drop(["JOURNEE", "VALEUR_REELLE", "VALEUR_CONSOLIDE"], axis=1)
 
     with st.form("valeur_previsionnelle_form"):
         edited_df = st.data_editor(
@@ -134,7 +138,7 @@ with tab2:
 
     with st.form("valeur_reelle_form"):
         yesterday_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{previous_date_str}')").to_pandas().drop(["VALEUR_CONSOLIDE"], axis=1)
-        st.data_editor(
+        yesterday_df_updated = st.data_editor(
             yesterday_df,
             use_container_width=True,
             disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE"]
@@ -143,8 +147,11 @@ with tab2:
         submit_valeur_reelle_button = st.form_submit_button("Submit")
 
     if submit_valeur_reelle_button:
-        pass
-
+        snowflake_df = session.create_dataframe(yesterday_df_updated)
+        snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_REELLE")
+        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_REELLE=TEMPORARY_VALEUR_REELLE.VALEUR_REELLE FROM TEMPORARY_VALEUR_REELLE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE= TEMPORARY_VALEUR_REELLE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_REELLE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_REELLE.COMBUSTIBLE"
+        session.sql(query).collect()
+        st.info("data updated in snowflake")
 
 with tab3:
     st.title("Insertion des données")
