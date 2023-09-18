@@ -73,7 +73,7 @@ with tab1:
     st.write(
         today_date_str
     )
-    chosen_date = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
+    chosen_date = today_date_str
 
     list_of_rows = [
         ["SAINT_OUEN_1", "GAZ", "tv"],
@@ -106,8 +106,8 @@ with tab1:
     )
     df["VALEUR_PREVISIONNELLE"] = 0
 
-    with st.form("my_form"):
-        st.data_editor(
+    with st.form("valeur_previsionnelle_form"):
+        edited_df = st.data_editor(
             df,
             use_container_width=True,
             disabled=["SITE", "COMBUSTIBLE", "UNITE"],
@@ -115,21 +115,36 @@ with tab1:
         )
         submitted = st.form_submit_button("Submit")
 
-    df["JOURNEE"] = chosen_date
-    df["VALEUR_REELLE"] = 0
-    df["VALEUR_CONSOLIDE"] =False
-
+    edited_df["JOURNEE"] = chosen_date
+    edited_df["VALEUR_REELLE"] = 0
+    edited_df["VALEUR_CONSOLIDE"] =False
     
-    existing_df = session.sql("select * from KPI_GIM_DEBIT_POINTE").to_df("JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE", "VALEUR_REELLE", "VALEUR_CONSOLIDE")
+    existing_df = session.sql("select * from KPI_GIM_DEBIT_POINTE").to_pandas()
+
     if submitted:
-        pd.concat([existing_df, df])
+        final_df = pd.concat([existing_df, edited_df])
+        snowflake_df = session.create_dataframe(final_df)
+        snowflake_df.write.mode("overwrite").save_as_table("KPI_GIM_DEBIT_POINTE")
+        st.info("data written into snowflake")
+
 
 with tab2:
-    st.title("Saisie des données réelles")
     previous_date_str = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
-    st.write(
-        previous_date_str
-    )
+    st.title(f"Saisie des données réelles pour le {previous_date_str}")
+
+    with st.form("valeur_reelle_form"):
+        yesterday_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{previous_date_str}')").to_pandas().drop(["VALEUR_CONSOLIDE"], axis=1)
+        st.data_editor(
+            yesterday_df,
+            use_container_width=True,
+            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE"]
+            # hide_index=True
+        )
+        submit_valeur_reelle_button = st.form_submit_button("Submit")
+
+    if submit_valeur_reelle_button:
+        pass
+
 
 with tab3:
     st.title("Insertion des données")
