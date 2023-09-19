@@ -161,6 +161,7 @@ with tab2:
 
 with tab3:
     st.title(f"Contrôle de cohérence: validation des valeurs réelles")
+
     with st.form("valeur_consolide_form"):
         valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE and JOURNEE IS DISTINCT FROM DATE('{today_date_str}')").to_pandas()
         valeur_a_consolider_df = st.data_editor(
@@ -176,7 +177,15 @@ with tab3:
         snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_CONSOLIDE")
         query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_CONSOLIDE=TEMPORARY_VALEUR_CONSOLIDE.VALEUR_CONSOLIDE FROM TEMPORARY_VALEUR_CONSOLIDE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_CONSOLIDE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_CONSOLIDE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_CONSOLIDE.COMBUSTIBLE"
         session.sql(query).collect()
-        st.info("data updated in snowflake")
+        st.info("data updated in snowflake, click refresh to refresh the page")
+
+        formbtn = st.button("Refresh")
+
+        if "formbtn_state" not in st.session_state:
+            st.session_state.formbtn_state = False
+
+        if submit_valeur_consolide_button or st.session_state.formbtn_state:
+            st.session_state.formbtn_state = True
 
 
 with tab4:
