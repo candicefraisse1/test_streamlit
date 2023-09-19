@@ -67,12 +67,10 @@ with middle:
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Saisie Prévisionnelle", "Saisie des données réelles", "Contrôle de cohérence", "Insertion des données", "Exploration des données"])
 
 with tab1:
-    st.title("Saisie Prévisionnelle")
-
     today_date_str = date.today().strftime('%Y-%m-%d')
-    st.write(
-        today_date_str
-    )
+
+    st.title(f"Saisie Prévisionnelle pour le {today_date_str}")
+
     chosen_date = today_date_str
     df_on_today_date = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')").to_pandas()
 
@@ -164,7 +162,7 @@ with tab2:
 with tab3:
     st.title(f"Contrôle de cohérence: validation des valeurs réelles")
     with st.form("valeur_consolide_form", clear_on_submit=True):
-        valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE").to_pandas()
+        valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE and JOURNEE IS DISTINCT FROM DATE('{today_date_str}')").to_pandas()
         valeur_a_consolider_df = st.data_editor(
             valeur_a_consolider_df,
             use_container_width=True,
