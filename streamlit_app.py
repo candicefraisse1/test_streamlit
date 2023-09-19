@@ -7,23 +7,10 @@ import datetime
 from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark import Session
 from snowflake.snowpark.functions import col
-from aws_connector import get_secret_value
+from src.infra.aws_connector import get_secret_value
 import plotly.express as px
 import plotly.figure_factory as ff
 from datetime import date, timedelta
-
-
-# # Get the credentials
-# config_location = '.'
-#
-# config = json.loads(open(str(config_location+'/secrets.json')).read())
-#
-# username = config['secrets']['username']
-# password = config['secrets']['password']
-# account = config['secrets']['account']
-# role = config['secrets']['role']
-# database = config['secrets']['database']
-# schema = config['secrets']['schema']
 
 snowflake_secrets = get_secret_value('SnowflakeSecrets')
 username = snowflake_secrets['username']
@@ -32,16 +19,6 @@ account = snowflake_secrets['account']
 role = snowflake_secrets['role']
 database = snowflake_secrets['database']
 schema = snowflake_secrets['schema']
-
-# ctx = snowflake.connector.connect( user=username, password=password, account=account)
-# cs = ctx.cursor()
-# try:
-#     cs.execute("SELECT current_version()")
-#     one_row = cs.fetchone()
-#     print(one_row[0])
-# finally:
-#     cs.close()
-# ctx.close()
 
 connection_parameters = {
     "account": account,
@@ -109,7 +86,7 @@ with tab1:
         df_on_today_date.insert(0, "JOURNEE", chosen_date, allow_duplicates=True)
         df_on_today_date["VALEUR_PREVISIONNELLE"] = 0
         df_on_today_date["VALEUR_REELLE"] = 0
-        df_on_today_date["VALEUR_CONSOLIDE"] = False
+        df_on_today_date["VALEUR_CONSOLIDEE"] = False
 
         snowflake_df = session.create_dataframe(df_on_today_date)
         snowflake_df.write.mode("append").save_as_table("KPI_GIM_DEBIT_POINTE")
@@ -122,7 +99,7 @@ with tab1:
             hide_index=True,
             column_config={
                 "VALEUR_REELLE":None,
-                "VALEUR_CONSOLIDE":None
+                "VALEUR_CONSOLIDEE":None
             }
         )
         submitted = st.form_submit_button("Submit")
@@ -156,7 +133,7 @@ with tab2:
             disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE"],
             hide_index=True,
             column_config={
-                "VALEUR_CONSOLIDE":None
+                "VALEUR_CONSOLIDEE":None
             }
         )
         submit_valeur_reelle_button = st.form_submit_button("Submit")
@@ -180,20 +157,20 @@ with tab2:
 with tab3:
     st.title(f"Contrôle de cohérence: validation des valeurs réelles")
 
-    with st.form("valeur_consolide_form"):
-        valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE and JOURNEE IS DISTINCT FROM DATE('{today_date_str}')").to_pandas()
-        valeur_a_consolider_df = st.data_editor(
-            valeur_a_consolider_df,
+    with st.form("valeur_CONSOLIDEE_form"):
+        valeur_a_CONSOLIDEEr_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDEE = FALSE and JOURNEE IS DISTINCT FROM DATE('{today_date_str}')").to_pandas()
+        valeur_a_CONSOLIDEEr_df = st.data_editor(
+            valeur_a_CONSOLIDEEr_df,
             use_container_width=True,
             disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE", "VALEUR_REELLE"],
             hide_index=True
         )
-        submit_valeur_consolide_button = st.form_submit_button("Submit")
+        submit_valeur_CONSOLIDEE_button = st.form_submit_button("Submit")
 
-    if submit_valeur_consolide_button:
-        snowflake_df = session.create_dataframe(valeur_a_consolider_df)
-        snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_CONSOLIDE")
-        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_CONSOLIDE=TEMPORARY_VALEUR_CONSOLIDE.VALEUR_CONSOLIDE FROM TEMPORARY_VALEUR_CONSOLIDE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_CONSOLIDE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_CONSOLIDE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_CONSOLIDE.COMBUSTIBLE"
+    if submit_valeur_CONSOLIDEE_button:
+        snowflake_df = session.create_dataframe(valeur_a_CONSOLIDEEr_df)
+        snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_CONSOLIDEE")
+        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_CONSOLIDEE=TEMPORARY_VALEUR_CONSOLIDEE.VALEUR_CONSOLIDEE FROM TEMPORARY_VALEUR_CONSOLIDEE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_CONSOLIDEE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_CONSOLIDEE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_CONSOLIDEE.COMBUSTIBLE"
         session.sql(query).collect()
         st.info("data updated in snowflake, click refresh to refresh the page")
 
@@ -202,7 +179,7 @@ with tab3:
         if "formbtn_state" not in st.session_state:
             st.session_state.formbtn_state = False
 
-        if submit_valeur_consolide_button or st.session_state.formbtn_state:
+        if submit_valeur_CONSOLIDEE_button or st.session_state.formbtn_state:
             st.session_state.formbtn_state = True
 
 
