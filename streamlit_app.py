@@ -162,7 +162,24 @@ with tab2:
         st.info("data updated in snowflake")
 
 with tab3:
-    pass
+    st.title(f"Contrôle de cohérence: validation des valeurs réelles")
+    with st.form("valeur_consolide_form", clear_on_submit=True):
+        valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE").to_pandas()
+        valeur_a_consolider_df = st.data_editor(
+            valeur_a_consolider_df,
+            use_container_width=True,
+            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE", "VALEUR_REELLE"],
+            hide_index=True
+        )
+        submit_valeur_consolide_button = st.form_submit_button("Submit")
+
+    if submit_valeur_consolide_button:
+        snowflake_df = session.create_dataframe(valeur_a_consolider_df)
+        snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_CONSOLIDE")
+        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_CONSOLIDE=TEMPORARY_VALEUR_CONSOLIDE.VALEUR_CONSOLIDE FROM TEMPORARY_VALEUR_CONSOLIDE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_CONSOLIDE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_CONSOLIDE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_CONSOLIDE.COMBUSTIBLE"
+        session.sql(query).collect()
+        st.info("data updated in snowflake")
+
 
 with tab4:
     st.title("Insertion des données")
