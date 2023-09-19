@@ -64,19 +64,20 @@ with middle:
     st.image('c-logo.svg')
 
 
-tab1, tab2, tab3, tab4 = st.tabs(["Saisie Provisionnelle", "Saisie des données réelles", "Insertion des données", "Exploration des données"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Saisie Prévisionnelle", "Saisie des données réelles", "Contrôle de cohérence", "Insertion des données", "Exploration des données"])
 
 with tab1:
-    st.title("Saisie Provisionnelle")
+    st.title("Saisie Prévisionnelle")
 
     today_date_str = date.today().strftime('%Y-%m-%d')
     st.write(
         today_date_str
     )
     chosen_date = today_date_str
-    df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')").to_pandas()
+    df_on_today_date = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')").to_pandas()
 
-    if df.empty():
+    # initialisation des données du jour si elles n'existent pas encore
+    if df_on_today_date.empty:
         list_of_rows = [
             ["SAINT_OUEN_1", "GAZ", "tv"],
             ["SAINT_OUEN_2", "CHARBON_ET_BOIS", "tv"],
@@ -102,34 +103,38 @@ with tab1:
             ["SYCTOM_ISSEANE", "OM_ISSEANE","tv"],
             ["SYCTOM_ST_OUEN", "OM_ST_OUEN","tv"]
         ]
-        df = pd.DataFrame(
+        df_on_today_date = pd.DataFrame(
             list_of_rows,
             columns=["SITE", "COMBUSTIBLE", "UNITE"]
         )
-        df["VALEUR_PREVISIONNELLE"] = 0
-    else:
-        df= df.drop(["JOURNEE", "VALEUR_REELLE", "VALEUR_CONSOLIDE"], axis=1)
+
+        df_on_today_date.insert(0, "JOURNEE", chosen_date, allow_duplicates=True)
+        df_on_today_date["VALEUR_PREVISIONNELLE"] = 0
+        df_on_today_date["VALEUR_REELLE"] = 0
+        df_on_today_date["VALEUR_CONSOLIDE"] = False
+
+        snowflake_df = session.create_dataframe(df_on_today_date)
+        snowflake_df.write.mode("append").save_as_table("KPI_GIM_DEBIT_POINTE")
 
     with st.form("valeur_previsionnelle_form"):
-        edited_df = st.data_editor(
-            df,
+        edited_valeur_previsionnelle_df = st.data_editor(
+            df_on_today_date,
             use_container_width=True,
-            disabled=["SITE", "COMBUSTIBLE", "UNITE"],
-            hide_index=True
+            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE"],
+            hide_index=True,
+            column_config={
+                "VALEUR_REELLE":None,
+                "VALEUR_CONSOLIDE":None
+            }
         )
         submitted = st.form_submit_button("Submit")
 
-    edited_df["JOURNEE"] = chosen_date
-    edited_df["VALEUR_REELLE"] = 0
-    edited_df["VALEUR_CONSOLIDE"] =False
-    
-    existing_df = session.sql("select * from KPI_GIM_DEBIT_POINTE").to_pandas()
-
     if submitted:
-        final_df = pd.concat([existing_df, edited_df])
-        snowflake_df = session.create_dataframe(final_df)
-        snowflake_df.write.mode("overwrite").save_as_table("KPI_GIM_DEBIT_POINTE")
-        st.info("data written into snowflake")
+        snowflake_df = session.create_dataframe(edited_valeur_previsionnelle_df)
+        snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_PREVISIONNELLE")
+        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_PREVISIONNELLE=TEMPORARY_VALEUR_PREVISIONNELLE.VALEUR_PREVISIONNELLE, KPI_GIM_DEBIT_POINTE.VALEUR_REELLE=TEMPORARY_VALEUR_PREVISIONNELLE.VALEUR_PREVISIONNELLE FROM TEMPORARY_VALEUR_PREVISIONNELLE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_PREVISIONNELLE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_PREVISIONNELLE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_PREVISIONNELLE.COMBUSTIBLE"
+        session.sql(query).collect()
+        st.info("data updated in snowflake")
 
 
 with tab2:
@@ -137,23 +142,29 @@ with tab2:
     st.title(f"Saisie des données réelles pour le {previous_date_str}")
 
     with st.form("valeur_reelle_form"):
-        yesterday_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{previous_date_str}')").to_pandas().drop(["VALEUR_CONSOLIDE"], axis=1)
+        yesterday_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{previous_date_str}')").to_pandas()
         yesterday_df_updated = st.data_editor(
             yesterday_df,
             use_container_width=True,
-            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE"]
-            # hide_index=True
+            disabled=["JOURNEE", "SITE", "COMBUSTIBLE", "UNITE", "VALEUR_PREVISIONNELLE"],
+            hide_index=True,
+            column_config={
+                "VALEUR_CONSOLIDE":None
+            }
         )
         submit_valeur_reelle_button = st.form_submit_button("Submit")
 
     if submit_valeur_reelle_button:
         snowflake_df = session.create_dataframe(yesterday_df_updated)
         snowflake_df.write.mode("overwrite").save_as_table("TEMPORARY_VALEUR_REELLE")
-        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_REELLE=TEMPORARY_VALEUR_REELLE.VALEUR_REELLE FROM TEMPORARY_VALEUR_REELLE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE= TEMPORARY_VALEUR_REELLE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_REELLE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_REELLE.COMBUSTIBLE"
+        query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_REELLE=TEMPORARY_VALEUR_REELLE.VALEUR_REELLE FROM TEMPORARY_VALEUR_REELLE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_REELLE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_REELLE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_REELLE.COMBUSTIBLE"
         session.sql(query).collect()
         st.info("data updated in snowflake")
 
 with tab3:
+    pass
+
+with tab4:
     st.title("Insertion des données")
     # Get the current credentials
     with st.form("Debit pointe "):
@@ -194,7 +205,7 @@ with tab3:
         st.experimental_rerun()
 
 
-with tab4:
+with tab5:
     st.title("Exploration des données des données")
     df = session.sql("select site,sum(valeur)as valeur from DEBIT_POINTE group by site")
     fig = px.bar(df, y='VALEUR', x='SITE',
@@ -202,9 +213,3 @@ with tab4:
                  color_discrete_map="identity",
                  title='Histogramme montrant la production de combustibles par site')
     st.plotly_chart(fig)
-
-    # pass
-
-    # if valid_bt:
-    #     snowdf.write.mode("overwrite").save_as_table("DEBIT_POINTE")
-    #     st.experimental_rerun()
