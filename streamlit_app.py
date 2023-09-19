@@ -161,7 +161,7 @@ with tab2:
 
 with tab3:
     st.title(f"Contrôle de cohérence: validation des valeurs réelles")
-    with st.form("valeur_consolide_form", clear_on_submit=True):
+    with st.form("valeur_consolide_form"):
         valeur_a_consolider_df = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where VALEUR_CONSOLIDE = FALSE and JOURNEE IS DISTINCT FROM DATE('{today_date_str}')").to_pandas()
         valeur_a_consolider_df = st.data_editor(
             valeur_a_consolider_df,
