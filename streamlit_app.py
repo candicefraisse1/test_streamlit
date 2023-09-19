@@ -134,6 +134,15 @@ with tab1:
         session.sql(query).collect()
         st.info("data updated in snowflake")
 
+    csv_df_donnees_previsionnelles = edited_valeur_previsionnelle_df.to_csv().encode('utf-8')
+
+    st.download_button(
+        label="Download data as CSV",
+        data=csv_df_donnees_previsionnelles,
+        file_name='donnees_previsionnelles_du_jour_dispatcher.csv',
+        mime='text/csv',
+    )
+
 
 with tab2:
     previous_date_str = (date.today() - timedelta(1)).strftime('%Y-%m-%d')
@@ -158,6 +167,15 @@ with tab2:
         query = "UPDATE KPI_GIM_DEBIT_POINTE SET KPI_GIM_DEBIT_POINTE.VALEUR_REELLE=TEMPORARY_VALEUR_REELLE.VALEUR_REELLE FROM TEMPORARY_VALEUR_REELLE WHERE KPI_GIM_DEBIT_POINTE.JOURNEE=TEMPORARY_VALEUR_REELLE.JOURNEE AND KPI_GIM_DEBIT_POINTE.SITE=TEMPORARY_VALEUR_REELLE.SITE AND KPI_GIM_DEBIT_POINTE.COMBUSTIBLE=TEMPORARY_VALEUR_REELLE.COMBUSTIBLE"
         session.sql(query).collect()
         st.info("data updated in snowflake")
+
+    csv_df_donnes_reelles = yesterday_df_updated.to_csv().encode('utf-8')
+
+    st.download_button(
+        label="Download data as CSV",
+        data=csv_df_donnes_reelles,
+        file_name='donnees_reelles_dispatcher.csv',
+        mime='text/csv',
+    )
 
 with tab3:
     st.title(f"Contrôle de cohérence: validation des valeurs réelles")
