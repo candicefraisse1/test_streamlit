@@ -1,10 +1,12 @@
 import streamlit as st
 
-from datetime import date
+from datetime import date, timedelta
 
 from src.entity.kpi_gim_debit_pointe_dataframe import KpiGimDebitPointeDataframe
 from src.infra.snowflake_connector import SnowflakeConnector
-from src.infra.streamlit_features import display_button_to_download_displayed_dataframe_into_csv
+from src.infra.streamlit_features import display_button_to_download_displayed_dataframe_into_csv, \
+    get_start_end_date_from_calendar_filter
+
 
 class ValeurPrevisionnelle:
 
@@ -12,12 +14,17 @@ class ValeurPrevisionnelle:
         self.snowflake_connector = snowflake_connector
 
     def show_tab(self):
-        today_date_str = date.today().strftime('%Y-%m-%d')
+        today_date = date.today()
+        max_date = today_date + timedelta(days=30)
 
-        st.title(f"Saisie Prévisionnelle pour le {today_date_str}")
+        st.title(f"Saisie des données prévisionnelles")
 
-        chosen_date = today_date_str
-        query = f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')"
+
+        date_tuple = get_start_end_date_from_calendar_filter(today_date, today_date, max_date)
+        start_date=date_tuple[0]
+        end_date=date_tuple[-1]
+
+        query = f"SELECT * FROM KPI_GIM_DEBIT_POINTE WHERE JOURNEE BETWEEN DATE('{start_date}') AND DATE('{end_date}')"
         df_on_today_date = self.snowflake_connector.get_df_from_sql_query(query)
 
         with st.form("valeur_previsionnelle_form"):
@@ -32,7 +39,6 @@ class ValeurPrevisionnelle:
                 }
             )
             submitted = st.form_submit_button("Submit")
-
 
         if submitted:
             self.snowflake_connector.overwrite_snowflake_table(df_on_today_date, "TEMPORARY_VALEUR_PREVISIONNELLE")

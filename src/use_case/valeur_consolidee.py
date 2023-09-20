@@ -4,6 +4,7 @@ import streamlit as st
 
 from src.entity.kpi_gim_debit_pointe_dataframe import KpiGimDebitPointeDataframe
 from src.infra.snowflake_connector import SnowflakeConnector
+from src.infra.streamlit_features import get_start_end_date_from_calendar_filter
 
 
 class ValeurConsolidee:
@@ -12,12 +13,18 @@ class ValeurConsolidee:
         self.snowflake_connector = snowflake_connector
 
     def show_tab(self):
-        day_before_yesterday_str = ( date.today() - timedelta(days=2) ).strftime('%Y-%m-%d')
+        yesterday_date = date.today() - timedelta(1)
+        current_year = date.today().year
+        min_date = date(current_year,1,1)
 
         st.title(f"Contrôle de cohérence: validation des valeurs réelles")
 
+        date_tuple = get_start_end_date_from_calendar_filter(yesterday_date, min_date, yesterday_date)
+        start_date = date_tuple[0]
+        end_date = date_tuple[-1]
+
         with st.form("valeur_consolidee_form"):
-            query = f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE < DATE('{day_before_yesterday_str}')"
+            query = f"SELECT * FROM KPI_GIM_DEBIT_POINTE WHERE JOURNEE BETWEEN DATE('{start_date}') AND DATE('{end_date}')"
             valeur_a_consolider_df = self.snowflake_connector.get_df_from_sql_query(query)
             valeur_a_consolider_df = st.data_editor(
                 valeur_a_consolider_df,
