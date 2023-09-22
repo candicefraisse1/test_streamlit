@@ -57,10 +57,15 @@ valeur_reelle = ValeurReelle(sf_connector)
 valeur_consolidee = ValeurConsolidee(sf_connector)
 
 with tab1:
+    from st_oauth import st_oauth
+
+    st.markdown("## This (and above) is always seen")
+    id = st_oauth('myoauth', 'Click to login via Okta')
+    st.markdown("## This (and below) is only seen after authentication")
     valeur_previsionnelle.show_tab()
     # today_date_str = date.today().strftime('%Y-%m-%d')
     #
-    # st.title(f"Saisie Prévisionnelle pour le {today_date_str}")
+    # st.title(f"Saisie pip install PyJWT=1.6.4Prévisionnelle pour le {today_date_str}")
     #
     # chosen_date = today_date_str
     # df_on_today_date = session.sql(f"select * from KPI_GIM_DEBIT_POINTE where JOURNEE = DATE('{chosen_date}')").to_pandas()
